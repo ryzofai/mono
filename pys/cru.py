@@ -1,7 +1,8 @@
-from flask import Flask, jsonify, request, make_response, session, app, redirect
-import flask_login
+from flask import Flask, jsonify, request, make_response, app, redirect, render_template, flash, redirect, url_for, session, request, logging
+#import flask_login
 import datetime
 import jwt
+from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from functools import wraps
 
 app = Flask(__name__)
@@ -20,7 +21,7 @@ def token_required(f):
 		#token = req['token']
 		token =  request.cookies.get('token')
 		if not token:
-			return redirect("/login", code=401)
+			return redirect('login')
 		try: 
 			data = jwt.decode(token, app.config['SECRET_KEY'])
 		except:
@@ -52,8 +53,8 @@ def protected2():
 	req = request.get_json()
 	return jsonify({'message' : 'protected 2.'})
 	
-@app.route('/login')
-def login():
+@app.route('/login2')
+def login2():
 	#req = request.get_json()
 	#token_instance =  request.cookies.get('token')
 	
@@ -65,6 +66,46 @@ def login():
 		token = jwt.encode({'user' : auth.username, 'exp' : datetime.datetime.utcnow() + datetime.timedelta(seconds=10)}, app.config['SECRET_KEY'])
 		return jsonify({'token' : token.decode('UTF-8')}), 200, {'Set-Cookie': 'token=' + token.decode('UTF-8') + '; Max-Age=10'}
 	return make_response('Could not verify!', 401, {'WWW-Authenticate' : 'Basic realm="Login Required"'})
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+	if request.method == 'POST':
+        # Get Form Fields
+		username = request.form['username']
+		password_candidate = request.form['password']
+
+        # Create cursor
+        #cur = mysql.connection.cursor()
+
+        # Get user by username
+        #result = cur.execute("SELECT * FROM users WHERE username = %s", [username])
+
+		#if result > 0:
+            # Get stored hash
+            #data = cur.fetchone()
+            #password = data['password']
+
+            # Compare Passwords
+        
+		if (username == 'user' and password_candidate == 'secret'):
+            # Passed
+            #session['logged_in'] = True
+            #session['username'] = username
+			#auth = request.authorization
+			token = jwt.encode({'user' : username, 'exp' : datetime.datetime.utcnow() + datetime.timedelta(seconds=10)}, app.config['SECRET_KEY'])
+			#flash('You are now logged in', 'success')
+			return redirect('protected'), {'Set-Cookie': 'token=' + token.decode('UTF-8') + '; Max-Age=10'}
+		else:
+			error = 'Invalid login'
+			return render_template('login.html', error=error)
+        # Close connection
+		# cur.close()
+		#else:
+		#	error = 'Username not found'
+		#	return render_template('login.html', error=error)
+
+	return render_template('login.html')
+
 
 if __name__ == '__main__':
 	app.run(debug=True)
