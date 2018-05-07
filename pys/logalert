@@ -1,0 +1,60 @@
+package main
+
+import (
+    "fmt"
+	"time"
+	"bufio"
+	"log"
+	"os"
+	"net/smtp"
+	"strings"
+)
+
+// https://tour.golang.org/concurrency/1
+
+func main() {
+
+    file, err := os.Open("note.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	for 1 == 1 {
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			if strings.Contains(scanner.Text(), "error") {
+				sendMail(scanner.Text())
+			}
+			fmt.Println(scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			log.Fatal(err)
+		}
+		time.Sleep(10000 * time.Millisecond)
+	}
+}
+
+func sendMail(body string) {
+	from := "rfajatin@mail.landbank.com"
+	pass := "..."
+	to1 := "rfajatin@mail.landbank.com"
+	to2 := "pgarcia@mail.landbank.com"
+	
+	msg := "From: " + from + "\n" +
+		"To: " + to1 + "," + to2 + "\n" +
+		"Subject: Alert!\n\n" +
+		body
+
+	err := smtp.SendMail("192.168.1.200:25",
+		smtp.PlainAuth("", from, pass, "192.168.1.200"),
+		from, []string{to1, to2}, []byte(msg))
+
+	if err != nil {
+		log.Printf("smtp error: %s", err)
+		return
+	}
+	
+	log.Print("sent!")
+}
+
