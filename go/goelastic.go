@@ -51,7 +51,8 @@ func main() {
 	}*/
 
 	// Index a tweet (using JSON serialization)
-	logster := Logstream{Message: "test log 4"}
+
+	logster := Logstream{Created: time.Now(), Message: "test log 4"}
 	put1, err := client.Index().
 		Index("logstreamer-").
 		Type("doc").
