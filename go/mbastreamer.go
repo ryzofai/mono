@@ -63,7 +63,10 @@ func prospector(files string, c chan string) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	defer file.Close()
+	//defer file.Close()
+	// rewrite: read only if modified date & time != saved modified date & time
+	// 			read only from saved record line 
+	var counter int
 
 	for {
 		line := bufio.NewScanner(file)
@@ -82,7 +85,8 @@ func prospector(files string, c chan string) {
 		if err := line.Err(); err != nil {
 			fmt.Println(err)
 		}
-		time.Sleep(2 * time.Second)
+		//file.Close()
+		time.Sleep(10 * time.Second)
 	}
 	c <- "running..."
 }
