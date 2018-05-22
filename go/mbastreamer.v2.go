@@ -40,60 +40,58 @@ func main() {
 	if err != nil {  
 		fmt.Println(err)
 	}
-	c := make(chan string)
+	//c := make(chan string)
 	files := strings.Split(configuration.Files_to_monitor, ",")
 	for i := range files {
 		// race condition on logging.. =( 
-		go prospector(files[i], c)
+		go prospector(files[i])
 
 		sendTo := strings.Split(configuration.Email_to, ",")
 		for email := range sendTo {
-			go sendMail("MBA", "log streamer started", sendTo[email])
+			sendMail("MBA", "log streamer started", sendTo[email])
 			// go sendMail("MBA", "log streamer started", configuration.Email_to)
 		}
 		time.Sleep(5 * time.Second)
 	}
-	x := <-c
-	fmt.Println(x)
+	//x := <-c
+	//fmt.Println(x)
+	fmt.Println("done...")
 }
 
 var counter int = 1
 
-func prospector(files string, c chan string) {
-	for {
-		configuration := Configuration{}
-		err := gonfig.GetConf("config.json", &configuration)
-		if err != nil {  
-			fmt.Println(err)
-		}
-		file, err := os.Open(files)
-		if err != nil {
-			fmt.Println(err)
-		}
-		line := bufio.NewScanner(file)
-		for line.Scan() {
-			alertTerms := strings.Split(configuration.Alert_terms, ",")
-			for terms := range alertTerms {
-				if strings.Contains(line.Text(), alertTerms[terms]) {
-					sendTo := strings.Split(configuration.Email_to, ",")
-					for email := range sendTo {
-						go sendMail(files, line.Text(), sendTo[email])
-						if checkMsg(files + "|" + strconv.Itoa(counter) + "|" + line.Text()) == false {
-							elasticlogger(files + "|" + strconv.Itoa(counter) + "|" + line.Text()) // date(no timestamp), filename, save line number, specific log msg	
-						}
+func prospector(files string) {
+configuration := Configuration{}
+err := gonfig.GetConf("config.json", &configuration)
+if err != nil {  
+	fmt.Println(err)
+}
+file, err := os.Open(files)
+if err != nil {
+	fmt.Println(err)
+}
+line := bufio.NewScanner(file)
+for line.Scan() {
+	alertTerms := strings.Split(configuration.Alert_terms, ",")
+	for terms := range alertTerms {
+		if strings.Contains(line.Text(), alertTerms[terms]) {
+			sendTo := strings.Split(configuration.Email_to, ",")
+			for email := range sendTo {
+				go sendMail(files, line.Text(), sendTo[email])
+				if checkMsg(files + "|" + strconv.Itoa(counter) + "|" + line.Text()) == false {
+						elasticlogger(files + "|" + strconv.Itoa(counter) + "|" + line.Text()) // date(no timestamp), filename, save line number, specific log msg	
 					}
 				}
 			}
-			counter++
-			fmt.Println(files + " ||| " + strconv.Itoa(counter))
 		}
-		if err := line.Err(); err != nil {
-			fmt.Println(err)
-		}
-		counter = 1
-		time.Sleep(10 * time.Second)
+		counter++
 	}
-	c <- "running..."
+	if err := line.Err(); err != nil {
+		fmt.Println(err)
+	}
+	counter = 1
+	//time.Sleep(10 * time.Second)
+	//c <- "running..."
 }
 
 func sendMail(filename string, message string, to string) {
@@ -108,9 +106,9 @@ func sendMail(filename string, message string, to string) {
 	m.SetHeader("To", to)
 	m.SetHeader("Subject", configuration.Email_subject)
 	m.SetBody("text/text", "Alert term detected with the following details:\n" + "FILENAME: "+ filename + "" + "\nLINE CONTAINS: " + message)
-	// m.SetHeader("To", result[i])
-	// m.SetAddressHeader("Cc", "", "")
-	// m.Attach("/home/Alex/lolcat.jpg")
+// m.SetHeader("To", result[i])
+// m.SetAddressHeader("Cc", "", "")
+// m.Attach("/home/Alex/lolcat.jpg")
 
 	d := gomail.NewDialer(configuration.Smtp_ip, configuration.Smtp_port, "", "")
 
@@ -139,33 +137,33 @@ func elasticlogger(logthis string) {
 		fmt.Println("url null")
 		return
 	}
-	// Create an Elasticsearch client - *todo: update this to not use pointers to allow configuration from config file
+// Create an Elasticsearch client - *todo: update this to not use pointers to allow configuration from config file
 	client, err := elastic.NewClient(elastic.SetURL(*url), elastic.SetSniff(*sniff))
 	if err != nil {
 		fmt.Println(err)
 	}
 	_ = client
-	// print status message
+// print status message
 	fmt.Println("Connection succeeded")
 
-	//fmt.Println(configuration.Elasticsearch_Index + string(t.Year()) + string(t.Month()) + string(t.Day()))
+//fmt.Println(configuration.Elasticsearch_Index + string(t.Year()) + string(t.Month()) + string(t.Day()))
 	var msg string = "\"" + logthis + "\""
-	//t := time.Now()
-	//var indexDate = string(t.Year()) + string(t.Month()) + string(t.Day())
+//t := time.Now()
+//var indexDate = string(t.Year()) + string(t.Month()) + string(t.Day())
 	logit := Logstream{Created: time.Now(), Message: msg}
 	put1, err := client.Index().
 	Index(configuration.Elasticsearch_Index).
 	Type("doc").
-		//Id("1").
+	//Id("1").
 	BodyJson(logit).
 	Do(context.Background())
 	if err != nil {
-		// Handle error
+	// Handle error
 		fmt.Println(err)
 	}
 	fmt.Printf("Indexed logs %s to index %s, type %s\n", put1.Id, put1.Index, put1.Type)
 
-	// Flush to make sure the documents got written.
+// Flush to make sure the documents got written.
 	_, err = client.Flush().Index(configuration.Elasticsearch_Index).Do(context.Background())
 	if err != nil {
 		fmt.Println(err)
@@ -176,7 +174,7 @@ func elasticlogger(logthis string) {
 
 func logMsg(logstr string) {
 	f, err := os.OpenFile("log.txt", os.O_APPEND, 0600)
-	defer f.Close()
+//defer f.Close()
 	if fileExists("log.txt") != false {
 		if _, err = f.WriteString(logstr + "\n")
 		err != nil {
@@ -211,13 +209,13 @@ func checkMsg(msg string) bool {
 		if err != nil {
 			log.Fatal("Cannot create file", err)
 		}
-		//fmt.Println("in elsefier")
-		//fmt.Fprintf(efile, msg + "\n")
+	//fmt.Println("in elsefier")
+	//fmt.Fprintf(efile, msg + "\n")
 		efile.Close()
 		return false
-		// create file then log msg
-		// if no errors return true
-		// else return false
+	// create file then log msg
+	// if no errors return true
+	// else return false
 	}
 	return false
 }
@@ -233,7 +231,6 @@ func fileExists(fname string) bool {
 // add go routine function log maintenance.. clear log file contents daily
 // rename file only
 
-
 func renameFile() {
 	err :=  os.Rename("log.txt", "log.x.txt")
 	if err != nil {
@@ -243,7 +240,7 @@ func renameFile() {
 }
 
 func deleteFile() {
-	// delete file
+// delete file
 	var err = os.Remove("log.txt")
 	checkError(err)
 }
