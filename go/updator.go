@@ -6,8 +6,9 @@ import (
 "net/http"
 "os"
 "crypto/md5"
-"strings"
-"encoding/base64"
+"io/ioutil"
+"log"
+"github.com/abbot/go-http-auth"
 )
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -23,15 +24,15 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not authorized", 401)
 		return
 	}
-
-	savfile := r.Header.Get("file")
+	listdir()
+	savfile := r.Header.Get("filename")
 	file, err := os.Create(savfile)
 	if err != nil {
 		w.Write([]byte(fmt.Sprintf(err.Error())))
 	}
 	fmt.Println(r.Header.Get("file"))
 
-	info, err := os.Stat(r.Header.Get("file"))
+	info, err := os.Stat(r.Header.Get("filename"))
 	if err != nil {
 		w.Write([]byte(fmt.Sprintf(err.Error())))
 	}
@@ -60,10 +61,12 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/upload", uploadHandler)
-	http.HandleFunc("/st", auth(staticHandler))
-	fs := http.FileServer(http.Dir("C:\\Projects\\Go"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
-	//http.HandleFunc("/st", basicAuth(staticHandler))
+	authenticator := auth.NewBasicAuthenticator("localhost", Secret)
+	http.HandleFunc("/static/", auth.JustCheck(authenticator, handleFileServer("D:\\Golanger\\update.exe\\", "/static/")))
+	//fs := http.FileServer(http.Dir("D:\\Golanger\\update.exe\\"))
+	//http.Handle("/static/", http.StripPrefix("/static/", fs))
+	//http.HandleFunc("/listdir", auth(listdHandler))
+	//http.HandleFunc("/stream", auth(streamHandler))
 	http.ListenAndServe(":5050", nil)
 }
 
@@ -82,7 +85,7 @@ func ComputeMd5(filePath string) ([]byte, error) {
 	return hash.Sum(result), nil
 }
 
-func auth(fn http.HandlerFunc) http.HandlerFunc {
+/*func auth(fn http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, pass, _ := r.BasicAuth()
 		if user !="test" && pass != "pass" {
@@ -91,47 +94,35 @@ func auth(fn http.HandlerFunc) http.HandlerFunc {
 		}
 		fn(w, r)
 	}
-}
+}*/
 
-type handler func(w http.ResponseWriter, r *http.Request)
+func listdir() {
+    files, err := ioutil.ReadDir("./")
+    if err != nil {
+        fmt.Println(err)
+    }
 
-func basicAuth(pass handler) handler {
-
-    return func(w http.ResponseWriter, r *http.Request) {
-        
-        auth := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
-
-        if len(auth) != 2 || auth[0] != "Basic" {
-            http.Error(w, "authorization failed", http.StatusUnauthorized)
-            return
-        }
-
-        payload, _ := base64.StdEncoding.DecodeString(auth[1])
-        pair := strings.SplitN(string(payload), ":", 2)
-
-        if len(pair) != 2 || !validate(pair[0], pair[1]) {
-            http.Error(w, "authorization failed", http.StatusUnauthorized)
-            return
-        }
-
-        pass(w, r)
+    for _, f := range files {
+            fmt.Println(f.Name())
     }
 }
 
-func validate(username, password string) bool {
-    if username == "test" && password == "test" {
-        return true
+func handleFileServer(dir, prefix string) http.HandlerFunc {
+    fs := http.FileServer(http.Dir(dir))
+    realHandler := http.StripPrefix(prefix, fs).ServeHTTP
+    return func(w http.ResponseWriter, req *http.Request) {
+        log.Println(req.URL)
+        realHandler(w, req)
     }
-    return false
 }
 
-func GetOnly(h handler) handler {
-
-    return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method == "GET" {
-            h(w, r)
-            return
-        }
-        http.Error(w, "get only", http.StatusMethodNotAllowed)
+func Secret(user, realm string) string {
+    users := map[string]string{
+        "john": "$2a$14$qtJ1USY91vKe2fOWXD2piuzLaraB1H8EiajP0C5RsicEZz.4Epgnu", //hello
     }
+
+    if a, ok := users[user]; ok {
+        return a
+    }
+    return ""
 }
