@@ -57,7 +57,7 @@ func main() {
 	http.HandleFunc("/ls/", auth.JustCheck(authenticator, handleFileServer("./", "/ls/")))
 
 	configuration := Configuration{}
-	err := gonfig.GetConf("update.con", &configuration)
+	err := gonfig.GetConf("update.cfg", &configuration)
 	if err != nil {  
 		fmt.Println(err)
 	}
